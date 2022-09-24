@@ -5,8 +5,9 @@ use serde::{
 use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, fs::File, io::Cursor, path::Path};
 
 use crate::{
+    from_value,
     stream::{private::Sealed, Event, OwnedEvent, Writer},
-    Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value,
+    to_value, Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value,
 };
 
 struct VecWriter {
@@ -918,4 +919,41 @@ fn empty_array_and_dictionary_serialize_to_xml() {
 fn serde_yaml_to_value() {
     let value: Value = serde_yaml::from_str("true").unwrap();
     assert_eq!(value, Value::Boolean(true));
+}
+
+#[test]
+fn serialize_to_from_value() {
+    let dog = Animal::Dog(DogOuter {
+        inner: vec![DogInner {
+            a: (),
+            b: 12,
+            c: vec!["a".to_string(), "b".to_string()],
+            d: Some(Uid::new(42)),
+        }],
+    });
+
+    let dog_value = to_value(&dog).unwrap();
+
+    assert_eq!(
+        dog_value
+            .as_dictionary()
+            .unwrap()
+            .get("Dog")
+            .unwrap()
+            .as_dictionary()
+            .unwrap()
+            .get("inner")
+            .unwrap()
+            .as_array()
+            .unwrap()[0]
+            .as_dictionary()
+            .unwrap()["b"]
+            .as_unsigned_integer()
+            .unwrap(),
+        12
+    );
+
+    let dog_roundtrip: Animal = from_value(dog_value).unwrap();
+
+    assert_eq!(dog_roundtrip, dog);
 }
